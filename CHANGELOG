@@ -1,0 +1,38 @@
+**`0.0.1` – Diseño inicial:** Creación del diagrama de flujo en Excalidraw.
+
+**0.1.0 – Capa de Entrada:** Creación de la capa de entrada del proyecto con el Webhook POST.
+
+**0.1.1 – Pruebas de Entrada:** Pruebas funcionales de la capa de entrada con código de barras validos.
+
+**0.1.2 – Errores de Entrada:** Pruebas y validación de errores en la capa de entrada (solicitud vacía o código no numérico) devolviendo error 400 Bad Request.
+
+**0.2.0 – Capa de Datos:** Creación de la capa de datos del proyecto e integración HTTP con la API de Open Food Facts.
+
+**0.2.1 – Pruebas de Datos:** Pruebas de extracción de nutrientes válidas.
+
+**0.2.2 – Errores de Datos:** Pruebas y gestión de errores de la capa de datos: producto no encontrado (404) y datos nutricionales insuficientes (422).
+
+**0.3.0 – Capa de Lógica:** Creación de la capa de lógica del proyecto (clasificación por Semáforo, Nutri-Score, Clasificación estricta de veredctos y cálculo de Puntuación de Preocupación 0-3).
+
+**0.3.1 – Pruebas de Lógica:** Pruebas de la capa de lógica comprobando la correcta asignación de marcas y veredictos.
+
+**0.3.2 – Errores de Lógica:** Pruebas de casos límite en la lógica (gestión de nutriscore_grade como unknown o nulo con redirección a Semáforo).
+
+**0.4.0 – Capa de IA:** Creación de la capa de Inteligencia Artificial del proyecto utilizando el modelo LLM vía Groq.
+
+**0.4.1 – Pruebas de IA:** Pruebas de generación del párrafo de veredicto con datos del producto y viendo diferencias en el tono según el veredicto final.
+
+**0.4.2 – Errores de IA:** Pruebas del enrutamiento condicional de tono en la IA (alentador para saludable/moderado vs. cauto con delicadeza para no saludable).
+
+**0.5.0 – Capa de Salida:** Creación de la capa de salida del proyecto con formateo de mensajes.
+
+**0.5.1 – Pruebas de Salida:** Pruebas de la respuesta en texto plano de varias secciones.
+
+**0.5.2 – Errores de Salida:** Pruebas de formato JSON y cabeceras Content-Type según el tipo de respuesta (texto plano para 200, JSON para errores).
+
+**0.5.3 – Pruebas Integrales:** Pruebas de errores de todo el flujo de trabajo en n8n.
+
+**1.0.0 – Lanzamiento inicial:** Entrega de la versión de producción completa, verificada y documentada .
+
+**Claim**
+
