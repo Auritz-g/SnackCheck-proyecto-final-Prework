@@ -1,0 +1,1823 @@
+{
+  "name": "SnackCheck",
+  "nodes": [
+    {
+      "parameters": {
+        "model": "openai/gpt-oss-20b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        6496,
+        -80
+      ],
+      "id": "8bcfea7d-162e-4433-b4d0-4fab7544b374",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "1wkDqisbitnRApTG",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nutrition-check",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -528,
+        -16
+      ],
+      "id": "5e8b0ae3-12f0-4d73-aa6b-16f68e841ce1",
+      "name": "Webhook - Solicitud de Código de Barras",
+      "webhookId": "9e3da489-f707-4afd-87fe-9af8ede73916",
+      "notes": "El usuario inicia el flujo de trabajo introduciendo un código de barra de 13 números para enviarlos más adelante a la API.\n"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "aa609125-f72f-4789-a226-2594965f0683",
+              "leftValue": "={{ $json.body.barcode }}",
+              "rightValue": "",
+              "operator": {
+                "type": "number",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -304,
+        -16
+      ],
+      "id": "870b585a-e07d-43bf-aec1-99cebcb2e15e",
+      "name": "Validar - Código da barras existe",
+      "notes": "Verifica si el campo 'código de barras' existe en el cuerpo de la solicitud, que este sea numérico. \nDevuelve un error 400 con un mensaje y ejemplo claro de solución si falta\nDe lo contrario, pasa los datos al siguiente paso."
+    },
+    {
+      "parameters": {
+        "url": "=https://world.openfoodfacts.org/api/v2/product/{{ $('Webhook - Solicitud de Código de Barras').item.json.body.barcode }}.json?fields=product_name,brands,nutriscore_grade,nutriments",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -80,
+        -112
+      ],
+      "id": "5cf49cca-fb80-40a5-af3f-ba16b7898410",
+      "name": "Llamada API - Solicitar datos de producto escaneado",
+      "onError": "continueRegularOutput",
+      "notes": "La solicitud del usuario llega a la API y esta se encarga de buscar la existencia del producto y encontrar los datos en su base de datos."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "88ec64d7-6333-4322-bbba-ec40425c35fc",
+              "leftValue": "={{ $json.product.nutriments }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        368,
+        -208
+      ],
+      "id": "9a26513e-0e53-453c-ad11-ce01625d4bc9",
+      "name": "Validar - Datos del producto existen",
+      "notes": "Verifica que los campos de nutrientes del producto ofrecidos por la API no vengan vacíos.\nEn caso de que vengan vacíos, manda un mensaje de error 422 y un ejemplo claro para poder solucionar la solicitud."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"error\",\n  \"code\": \"MISSING_FIELD\",\n  \"message\": \"Se necesita un código de barras de 13 números para poder analizar el producto\",\n  \"field\": \"barcode\",\n  \"hint\": \"Por favor, asegurate de facilitar un código de barras correctamente\",\n  \"example\": \"barcode: 3017620422003\"\n}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -80,
+        80
+      ],
+      "id": "ea6c7f20-ba97-4105-a245-1a6862ae7c8b",
+      "name": "Error - Código de barras vacio"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"code\": \"MISSING_NUTRIMENTS\",\n  \"message\": \"El producto solicitado no cuenta con suficientes datos para un veredicto final\",\n  \"field\": \"nutriments\",\n  \"hint\": \"Por favor, intenta otra vez con un producto distinto\",\n  \"example\": \"barcode\": 3017620422003\n}",
+        "options": {
+          "responseCode": 422,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        592,
+        -112
+      ],
+      "id": "f582af43-ecfc-46e3-8957-536d83040174",
+      "name": "Error - Producto no está en las BBDD"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b36650c3-957e-421a-806c-76bcf437dfc1",
+              "leftValue": "={{ $('Determinar - Nivel de nutrientes').item.json.fat_100g }}",
+              "rightValue": 17.5,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2384,
+        -304
+      ],
+      "id": "c9a92221-a9ec-4797-afe6-fa8404e606d6",
+      "name": "Validar - Niveles de Grasa",
+      "notes": "Verifica que niveles de grasa se encuentran presente en el producto clasificándolo entre niveles bajos o altos dependiendo del valor obtenido y de los rangos."
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2832,
+        -304
+      ],
+      "id": "45112748-0046-4f5a-84d7-894835db9953",
+      "name": "Determinar - Niveles de Grasa",
+      "notes": "Resume los valores y niveles de grasa presente en el producto escaneado."
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"fatLevels\": \"low\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2608,
+        -400
+      ],
+      "id": "f49a2f56-5606-430a-9496-9539a63ed334",
+      "name": "Respuesta - Niveles de Grasa bajos"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3a92bbf1-6acd-4324-b974-92a0b43f4bfd",
+              "leftValue": "={{ $('Determinar - Nivel de nutrientes').item.json.salt_100g }}",
+              "rightValue": 1.5,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1712,
+        -304
+      ],
+      "id": "d49bb118-8f0c-4a73-a073-0bc54da380f8",
+      "name": "Validar - Niveles de Sal",
+      "notes": "Verifica que niveles de sal se encuentran presente en el producto clasificándolo entre niveles bajos o altos dependiendo del valor obtenido y de los rangos."
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"saltLevels\": \"low\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1936,
+        -400
+      ],
+      "id": "92fb1011-479b-41e2-a343-eacbc490a96f",
+      "name": "Respuesta - Niveles de Sal bajo"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"saltLevels\": \"high\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1936,
+        -208
+      ],
+      "id": "a9a91acc-a13b-4e3f-84c6-4ab3c341656c",
+      "name": "Respuesta - Niveles de Sal alto"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2160,
+        -304
+      ],
+      "id": "2f070c4e-5cde-462a-a0c3-7d93f9ee6d40",
+      "name": "Determinar - Niveles de Sal",
+      "notes": "Resume los valores y niveles de sal presente en el producto escaneado."
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1488,
+        -320
+      ],
+      "id": "859d3656-ecbf-4a44-8950-7f587d7e1fae",
+      "name": "Determinar - Niveles de Azúcar",
+      "notes": "Resume los valores y niveles de azúcar presente en el producto escaneado."
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"sugarLevels\": \"high\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1264,
+        -112
+      ],
+      "id": "38e6158b-eb2a-4a0b-8b1e-d4952c0af989",
+      "name": "Respuesta - Niveles de Azúcar Alto"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"sugarLevels\": \"medium\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1264,
+        -304
+      ],
+      "id": "50190d5e-2586-46bd-b94a-e54a264a71c8",
+      "name": "Respuesta - Niveles de Azúcar Medio"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"sugarLevels\": \"low\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1264,
+        -496
+      ],
+      "id": "c60c7bd5-daad-4209-8c76-d604856b0f28",
+      "name": "Respuesta - Niveles de Azúcar Bajo"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f3072189-7f29-4b86-8ed1-8bea499008e1",
+              "name": "sugars_100g",
+              "value": "={{ $json.product.nutriments.sugars_100g }}",
+              "type": "number"
+            },
+            {
+              "id": "132235aa-9254-4025-9c44-9e36527d0846",
+              "name": "salt_100g",
+              "value": "={{ $json.product.nutriments.salt_100g }}",
+              "type": "number"
+            },
+            {
+              "id": "508ae54b-5b81-4a82-b3bc-a9a038d8b144",
+              "name": "fat_100g",
+              "value": "={{ $json.product.nutriments.fat_100g }}",
+              "type": "number"
+            },
+            {
+              "id": "b99ac826-f585-467c-8e90-1a80265a331b",
+              "name": "energy-kcal_100g",
+              "value": "={{ $json.product.nutriments['energy-kcal_100g']}}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        592,
+        -304
+      ],
+      "id": "34da41bd-f874-4ee7-80a4-256225419c19",
+      "name": "Determinar - Nivel de nutrientes",
+      "notes": "Resume los datos de nutrientes Azúcar, Sal, Grasa y Energía de forma clara. "
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        5072,
+        -336
+      ],
+      "id": "1466c228-29be-421a-8fde-8a15c80d6909",
+      "name": "Determinar - Nutriscore grade",
+      "notes": "Determina cual es el valor de nutriscore en terminos sencillos como saludable, moderado, no saludable o unknown."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3258bc1d-530c-4851-b25e-90755b1bd361",
+              "name": "nutriscore_grade",
+              "value": "no saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        4848,
+        -208
+      ],
+      "id": "17d4a47e-0630-45a4-9554-81985c1f3137",
+      "name": "REspuesta - Nutriscore Grade Malo"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3258bc1d-530c-4851-b25e-90755b1bd361",
+              "name": "nutriscore_grade",
+              "value": "moderado",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        4848,
+        -400
+      ],
+      "id": "c77ee849-aecb-4439-8d8a-06b6798da4f9",
+      "name": "Respuesta - Nutriscore Grade Medio"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3258bc1d-530c-4851-b25e-90755b1bd361",
+              "name": "nutriscore_grade",
+              "value": "saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        4848,
+        -592
+      ],
+      "id": "12138eb1-3af8-4344-8f86-93c934dad56e",
+      "name": "Respuesta - Nutriscore Grade Bueno"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "379ea696-a111-433a-81cd-e3aaf60f4786",
+              "leftValue": "={{ $('Llamada API - Solicitar datos de producto escaneado').item.json.product.nutriscore_grade }}",
+              "rightValue": "a",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "ff8db3b7-9d29-45f0-b6f4-1ffaf9cef35a",
+              "leftValue": "={{ $('Llamada API - Solicitar datos de producto escaneado').item.json.product.nutriscore_grade }}",
+              "rightValue": "b",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4400,
+        -400
+      ],
+      "id": "9f0185c7-2608-48bc-85ed-b02c45057ff9",
+      "name": "Validar - Nutriscore grade saludable",
+      "notes": "Verifica si el valor de nutriscore es saludable o moderado.\nEn caso negativo, avanza para evaluar si es negativo o no saludable."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "379ea696-a111-433a-81cd-e3aaf60f4786",
+              "leftValue": "={{ $('Llamada API - Solicitar datos de producto escaneado').item.json.product.nutriscore_grade }}",
+              "rightValue": "c",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4624,
+        -304
+      ],
+      "id": "8fe6a196-476b-4ecd-9192-c1358de3159f",
+      "name": "Validar - Nutriscore grade moderado"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        3952,
+        -320
+      ],
+      "id": "2566bf92-c939-498e-bb0e-a456084420db",
+      "name": "Determinar - Conteo de semaforo"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "67b63721-a6a0-4926-8767-8a7873653204",
+              "name": "productKind",
+              "value": "moderado",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3728,
+        -304
+      ],
+      "id": "7628f308-8e56-4c96-8370-00b34e333b60",
+      "name": "Respuesta - Producto moderado"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "aadd3b18-c1a3-4239-a6fd-2d2d2c931c83",
+              "name": "produtKind",
+              "value": "No saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3728,
+        -112
+      ],
+      "id": "ac8ef4b4-ff7e-4183-b64d-cf8b0df64273",
+      "name": "Respuesta - Producto no saludable"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d1127f86-04f0-41ef-9f9b-a71c5a5b7e4b",
+              "leftValue": "={{ $json.nutrientLevelsHigh }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3280,
+        -304
+      ],
+      "id": "4c0bb129-07fd-488a-9b9c-f0777d36bf21",
+      "name": "Validar - Conteo de semaforo saludable",
+      "notes": "Verifica si el producto es saludable moderado o no saludable, dependiendo de si el producto tiene mucho niveles de nutrientes altos, pocos o ninguno."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "266387bb-b23b-40c3-a7cd-8c0860a5aae7",
+              "leftValue": "={{ $('Resumen - Nivel de nutrientes').item.json.nutrientLevelsHigh }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3504,
+        -208
+      ],
+      "id": "44987ea7-bbe9-4a11-aa5f-cc17001bdd36",
+      "name": "Validar - Conteo de semaforo moderado"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": 0,\n  \"code\": \"PRODUCT_NOT_FOUND\",\n  \"message\": \"Se necesita un código de barras de 13 números para poder analizar el producto\",\n  \"field\": \"barcode\",\n  \"hint\": \"Por favor, asegurate de facilitar un código de barras correctamente\",\n  \"example\": \"barcode: 3017620422003\"\n}",
+        "options": {
+          "responseCode": 404,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        368,
+        -16
+      ],
+      "id": "a8eeec15-9613-4778-8bfc-8316e2da2647",
+      "name": "Error - Producto no está en las BBDD1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2aa6979b-048a-4086-ac7b-834e3ba3c9c2",
+              "leftValue": "={{ $json.product }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        144,
+        -112
+      ],
+      "id": "7af840f7-04c6-4652-b1f8-ed6b2e42eab9",
+      "name": "Validar - Producto existe",
+      "notes": "Verifica que el producto escaneado por el usuario se encuentre en la Base de datos de la API.\nEn caso de que no exista, manda un mensaje de error 404 no encontrado y un ejemplo de como solucionarlo claro.\nEn caso de que exista, continúa al siguiente paso."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8e570ed2-50fc-46e5-b782-2dc1d4854918",
+              "leftValue": "={{ $json.finalVeredict }}",
+              "rightValue": "no saludable",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5520,
+        -304
+      ],
+      "id": "90f413bd-cd90-4edb-900d-1f15f70f5d4f",
+      "name": "Verificar - Producto no saludable",
+      "notes": "Verifica que el resumen de las dos lecturas incluya el termino \"no saludable\" para categorizarlo como saludable y quedarse con el peor de los veredictos.\nEn caso de que nutriscore sea unknown sigue el veredicto del conteo de semaforo dado que nunca contendrá las palabras saludables, moderado o no saludable."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3f134a22-ff85-44a4-8483-fa2cb876a684",
+              "leftValue": "={{ $('Reunir - Veredicto dos lecturas').item.json.finalVeredict }}",
+              "rightValue": "moderado",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        5744,
+        -208
+      ],
+      "id": "882b46e5-1b3d-4599-8e50-95d1004ecc7e",
+      "name": "Verificar - Producto moderado"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "628f1440-682b-49f7-8067-853b3f086d0b",
+              "name": "finalVeredict",
+              "value": "=[{{ $('Determinar - Conteo de semaforo').item.json.productKind }}, {{ $json.nutriscore_grade }}]",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5296,
+        -304
+      ],
+      "id": "21833575-b725-4ebd-a411-4df39606ae38",
+      "name": "Reunir - Veredicto dos lecturas",
+      "notes": "Hace un resumen de los veredictos de las dos lecturas previas."
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        6192,
+        -320
+      ],
+      "id": "a907d854-1d9f-4650-b2a7-93e59c877546",
+      "name": "Determinar - Veredicto final",
+      "notes": "Resume el veredicto final"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4105a369-68ff-4eb1-b79b-998efb64ae94",
+              "name": "nutrientLevelsHigh",
+              "value": "={{ ($('Determinar - Niveles de Azúcar').item.json.sugarLevels === \"high\" ? 1:0 ) + ($('Determinar - Niveles de Sal').item.json.saltLevels === \"high\" ? 1:0) +  ($('Determinar - Niveles de Grasa').item.json.fatLevels === \"high\" ? 1:0) }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {
+          "ignoreConversionErrors": true
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3056,
+        -304
+      ],
+      "id": "098c23e2-511b-4f33-8312-fcabd885ed2c",
+      "name": "Resumen - Nivel de nutrientes",
+      "notes": "Reúne los 3 niveles de los nutrientes deseados del producto en un nodo."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0b34530a-d1f0-4bcf-9137-e8c6ef1b2443",
+              "name": "message",
+              "value": "=🍜 Veredicto de Snackcheck para {{ $('Llamada API - Solicitar datos de producto escaneado').item.json.product.brands }}\n\n📊 Datos nutricionales\n   *  Niveles de Azúcar por 100 gr --> {{ $('Determinar - Nivel de nutrientes').item.json.sugars_100g }} gr\n   *  Niveles de Sal por 100 gr --> {{ $('Determinar - Nivel de nutrientes').item.json.salt_100g }} gr\n   *  Niveles de Grasa por 100 gr --> {{ $('Determinar - Nivel de nutrientes').item.json.fat_100g }} gr\n   *  Niveles de energía- kcal por 100 gr --> {{ $('Determinar - Nivel de nutrientes').item.json['energy-kcal_100g'] }} kcal\n\n📝 Recomendación: {{ $json.text }}\n\nGenerado el {{new Date().toLocaleDateString('es-ES', { month: 'long', day: 'numeric', year: 'numeric' })}}\n\n\n\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        6784,
+        -304
+      ],
+      "id": "11aac706-3d0f-45cb-80d8-d3b6a2e287de",
+      "name": "Mensaje - Veredicto final completo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "86999313-cc31-4c47-bfae-612bda9b7c75",
+              "leftValue": "={{ $('Llamada API - Solicitar datos de producto escaneado').item.json.product.nutriscore_grade }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "0bb034d7-cfb0-410d-8ab6-4e3b3d6dda49",
+              "leftValue": "={{ $('Llamada API - Solicitar datos de producto escaneado').item.json.product.nutriscore_grade }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "ab121d28-b91a-4ae6-886e-92d85a3acbea",
+              "leftValue": "={{ $('Llamada API - Solicitar datos de producto escaneado').item.json.product.nutriscore_grade }}",
+              "rightValue": "unknown",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4176,
+        -304
+      ],
+      "id": "bd97fb85-36c7-4027-a86e-eb080454727b",
+      "name": "Verificar - Nutriscore presente",
+      "notes": "Verifica si la API ha podido proporcionar un valor de nutriscore para valorar o no.\nEn caso positivo, avanza para valorar el nivel de nutriscore.\nEn caso negativo, el valor de nutriscore se vuelve \"unknown\"."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "53916ebf-5559-4e86-803a-57bfcec24256",
+              "leftValue": "={{ $json.sugars_100g }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        816,
+        -304
+      ],
+      "id": "e650e0b1-b29c-42ab-81f8-67481ac9a5db",
+      "name": "Validar - Niveles de Azúcar bajo",
+      "notes": "Verifica que niveles de azúcar se encuentran presente en el producto clasificándolo entre niveles bajos, medios o altos del valor obtenido y de los rangos."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "4c35a323-d41a-4faf-bd91-e9e713327648",
+              "leftValue": "={{ $('Determinar - Nivel de nutrientes').item.json.sugars_100g }}",
+              "rightValue": 22.5,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1040,
+        -208
+      ],
+      "id": "842ac265-3163-436f-b858-e263d6a55b96",
+      "name": "Validar - Niveles de Azúcar medio"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"fatLevels\": \"high\"\n}\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2608,
+        -208
+      ],
+      "id": "3c788824-4b8f-4799-b6f8-30509855aa03",
+      "name": "Respuesta - Niveles de Grasa altos"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "01388b6d-a579-4e6f-894a-4f6be446d058",
+              "name": "nutriscore_grade",
+              "value": "={{ $('Llamada API - Solicitar datos de producto escaneado').item.json.product.nutriscore_grade }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        4848,
+        -16
+      ],
+      "id": "eee98658-0c7f-4fa2-8d44-76c7b6d678ca",
+      "name": "Respuesta - Valor Nutriscore no presente"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9be539f2-dea2-481c-9511-182e89d534ac",
+              "name": "finalVeredict",
+              "value": "Moderado",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5968,
+        -304
+      ],
+      "id": "f46799f4-70b3-4caa-aa85-b08376669ba6",
+      "name": "Respuesta - Veredicto moderado"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "75e431b2-412c-41a3-adfd-e34634981bf8",
+              "name": "finalVeredict",
+              "value": "=No saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5968,
+        -496
+      ],
+      "id": "4bd7a06d-0189-494b-a137-3b0bb65979c9",
+      "name": "Respuesta - Veredicto no saludable"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3ccd621a-d6c2-47c3-9f49-94eb542e7fea",
+              "name": "finalVeredict",
+              "value": "Saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        5968,
+        -112
+      ],
+      "id": "13076d11-7ab6-4ff3-bc09-65569fd744fb",
+      "name": "Respuesta - Veredicto saludable"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4105a369-68ff-4eb1-b79b-998efb64ae94",
+              "name": "productKind",
+              "value": "=Saludable",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        3728,
+        -496
+      ],
+      "id": "9e26502d-5a05-4d12-9640-591fe0515a76",
+      "name": "Respuesta - Producto saludable"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.message }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "Plaint/text"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        6992,
+        -304
+      ],
+      "id": "0a631788-2d57-4f2d-866f-4a378e4c8945",
+      "name": "Respuesta - Veredicto final formateado"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Eres un amigo del usuario que le aconseja sobre un producto alimenticio.\n\nGenera un veredicto corto en un solo párrafo modificando el tono del mismo,\n Si  \"finalVeredict\" = \"no saludable\", utiliza un tono más profesional, cauteloso, pero con delicadeza y utiliza un marcador rojo.\n Si \"finalVeredict\" = \"saludable\" o \"moderado\", utiliza un tono más energetico, animado y ligero. Añade un marcador verde en su caso.\n\nInicia diciendo el veredicto final {{ $json.finalVeredict }} y continua explicando los detalles necesarios\n\nDatos a incluir obligatoriamente:\n- Evaluación: \n  {{ $('Determinar - Conteo de semaforo').item.json.productKind === $json.finalVeredict \n  ? 'La evaluación del producto coincide con la lectura del semáforo (azúcar, sal y grasa).' \n  : 'La evaluación del producto se basó en el Nutri-Score al ser la lectura más estricta.' }}",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        6416,
+        -320
+      ],
+      "id": "2870bb08-3204-4b1b-be02-8c8a78173672",
+      "name": "Consejo - Veredicto final con consejo de IA",
+      "notes": "Ofrece un consejo final para el usuario haciendole una lectura de los valores nutricionales y los veredictos finales"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Consejo - Veredicto final con consejo de IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Solicitud de Código de Barras": {
+      "main": [
+        [
+          {
+            "node": "Validar - Código da barras existe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Código da barras existe": {
+      "main": [
+        [
+          {
+            "node": "Llamada API - Solicitar datos de producto escaneado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - Código de barras vacio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Llamada API - Solicitar datos de producto escaneado": {
+      "main": [
+        [
+          {
+            "node": "Validar - Producto existe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Datos del producto existen": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Nivel de nutrientes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - Producto no está en las BBDD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error - Código de barras vacio": {
+      "main": [
+        []
+      ]
+    },
+    "Validar - Niveles de Grasa": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Niveles de Grasa bajos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Niveles de Grasa altos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determinar - Niveles de Grasa": {
+      "main": [
+        [
+          {
+            "node": "Resumen - Nivel de nutrientes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta - Niveles de Grasa bajos": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Niveles de Grasa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Niveles de Sal": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Niveles de Sal bajo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Niveles de Sal alto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta - Niveles de Sal bajo": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Niveles de Sal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta - Niveles de Sal alto": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Niveles de Sal",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Determinar - Niveles de Sal": {
+      "main": [
+        [
+          {
+            "node": "Validar - Niveles de Grasa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determinar - Niveles de Azúcar": {
+      "main": [
+        [
+          {
+            "node": "Validar - Niveles de Sal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta - Niveles de Azúcar Alto": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Niveles de Azúcar",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Respuesta - Niveles de Azúcar Medio": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Niveles de Azúcar",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Respuesta - Niveles de Azúcar Bajo": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Niveles de Azúcar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determinar - Nivel de nutrientes": {
+      "main": [
+        [
+          {
+            "node": "Validar - Niveles de Azúcar bajo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determinar - Nutriscore grade": {
+      "main": [
+        [
+          {
+            "node": "Reunir - Veredicto dos lecturas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REspuesta - Nutriscore Grade Malo": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Nutriscore grade",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Respuesta - Nutriscore Grade Medio": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Nutriscore grade",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Respuesta - Nutriscore Grade Bueno": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Nutriscore grade",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Nutriscore grade saludable": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Nutriscore Grade Bueno",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validar - Nutriscore grade moderado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Nutriscore grade moderado": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Nutriscore Grade Medio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "REspuesta - Nutriscore Grade Malo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determinar - Conteo de semaforo": {
+      "main": [
+        [
+          {
+            "node": "Verificar - Nutriscore presente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta - Producto moderado": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Conteo de semaforo",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Respuesta - Producto no saludable": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Conteo de semaforo",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Validar - Conteo de semaforo saludable": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Producto saludable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validar - Conteo de semaforo moderado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Conteo de semaforo moderado": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Producto moderado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Producto no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Producto existe": {
+      "main": [
+        [
+          {
+            "node": "Validar - Datos del producto existen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error - Producto no está en las BBDD1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar - Producto no saludable": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Veredicto no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Verificar - Producto moderado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar - Producto moderado": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Veredicto moderado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Veredicto saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reunir - Veredicto dos lecturas": {
+      "main": [
+        [
+          {
+            "node": "Verificar - Producto no saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determinar - Veredicto final": {
+      "main": [
+        [
+          {
+            "node": "Consejo - Veredicto final con consejo de IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen - Nivel de nutrientes": {
+      "main": [
+        [
+          {
+            "node": "Validar - Conteo de semaforo saludable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensaje - Veredicto final completo": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Veredicto final formateado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar - Nutriscore presente": {
+      "main": [
+        [
+          {
+            "node": "Validar - Nutriscore grade saludable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Valor Nutriscore no presente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Niveles de Azúcar bajo": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Niveles de Azúcar Bajo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validar - Niveles de Azúcar medio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar - Niveles de Azúcar medio": {
+      "main": [
+        [
+          {
+            "node": "Respuesta - Niveles de Azúcar Medio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respuesta - Niveles de Azúcar Alto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta - Niveles de Grasa altos": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Niveles de Grasa",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Respuesta - Valor Nutriscore no presente": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Nutriscore grade",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Respuesta - Veredicto moderado": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Veredicto final",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Respuesta - Veredicto no saludable": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Veredicto final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respuesta - Veredicto saludable": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Veredicto final",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Respuesta - Producto saludable": {
+      "main": [
+        [
+          {
+            "node": "Determinar - Conteo de semaforo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consejo - Veredicto final con consejo de IA": {
+      "main": [
+        [
+          {
+            "node": "Mensaje - Veredicto final completo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8c1d1986-30e1-4a75-8b45-548a5427f0c9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d902e1bc60cd43eaab34db49f7779f6e9afb25fb8a3df6a43207f2538441dbad"
+  },
+  "nodeGroups": [],
+  "id": "NfmcrRhN69lIorya",
+  "tags": []
+}
